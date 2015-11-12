@@ -4,7 +4,6 @@ using ParallelTasks;
 using Sandbox.Common.ObjectBuilders;
 using Sandbox.Common.ObjectBuilders.Definitions;
 using Sandbox.Common.ObjectBuilders.Gui;
-using Sandbox.Common.ObjectBuilders.Serializer;
 using Sandbox.Definitions;
 using Sandbox.Engine.Networking;
 using Sandbox.Game.Entities;
@@ -30,6 +29,7 @@ using VRageMath;
 using VRage.Library.Utils;
 using VRage.FileSystem;
 using Sandbox.Engine.Utils;
+using VRage.ObjectBuilders;
 #endregion
 
 
@@ -97,25 +97,31 @@ namespace Sandbox.Game.Gui
 
         static MyGuiBlueprintScreen()
         {
-            MySyncLayer.RegisterMessage<ShareBlueprintMsg>(ShareBlueprintRequest, MyMessagePermissions.Any);
+            MySyncLayer.RegisterMessage<ShareBlueprintMsg>(ShareBlueprintRequest, MyMessagePermissions.ToServer | MyMessagePermissions.FromServer);
         }
 
         static void ShareBlueprintRequest(ref ShareBlueprintMsg msg, MyNetworkClient sender)
         {
-            
-            var itemId = msg.WorkshopId;
-            var name = msg.Name;
-            var info = new MyBlueprintItemInfo(MyBlueprintTypeEnum.SHARED, id: itemId);
-            var item = new MyGuiControlListbox.Item(new StringBuilder(name.ToString()), userData: info, icon: MyGuiConstants.TEXTURE_BLUEPRINTS_ARROW.Normal);
-            item.ColorMask = new Vector4(0.7f);
-            if (!m_recievedBlueprints.Any(item2 => (item2.UserData as MyBlueprintItemInfo).PublishedItemId == (item.UserData as MyBlueprintItemInfo).PublishedItemId))
+            if (Sync.IsServer && msg.SendToId != Sync.MyId)
             {
-                m_recievedBlueprints.Add(item);
-                m_blueprintList.Add(item);
-                if (sender != null)
+                Sync.Layer.SendMessage(ref msg, msg.SendToId);
+            }
+            else
+            {
+                var itemId = msg.WorkshopId;
+                var name = msg.Name;
+                var info = new MyBlueprintItemInfo(MyBlueprintTypeEnum.SHARED, id: itemId);
+                var item = new MyGuiControlListbox.Item(new StringBuilder(name.ToString()), userData: info, icon: MyGuiConstants.TEXTURE_BLUEPRINTS_ARROW.Normal);
+                item.ColorMask = new Vector4(0.7f);
+                if (!m_recievedBlueprints.Any(item2 => (item2.UserData as MyBlueprintItemInfo).PublishedItemId == (item.UserData as MyBlueprintItemInfo).PublishedItemId))
                 {
-                    var notification = new MyHudNotificationDebug(sender.DisplayName + " just shared a blueprint with you.", 2500);
-                    MyHud.Notifications.Add(notification);
+                    m_recievedBlueprints.Add(item);
+                    m_blueprintList.Add(item);
+                    if (sender != null)
+                    {
+                        var notification = new MyHudNotificationDebug(sender.DisplayName + " just shared a blueprint with you.", 2500);
+                        MyHud.Notifications.Add(notification);
+                    }
                 }
             }
         }
@@ -213,6 +219,8 @@ namespace Sandbox.Game.Gui
         {
             base.RecreateControls(constructor);
 
+            MyAnalyticsHelper.ReportActivityStart(null, "show_blueprints", string.Empty, "gui", string.Empty);
+
             Vector2 searchPosition = new Vector2(0f, SCREEN_SIZE.Y - 1.58f);
 
             float hiddenPartTop = (SCREEN_SIZE.Y - 1.0f) / 2.0f;
@@ -226,7 +234,8 @@ namespace Sandbox.Game.Gui
                 Position = searchPosition + new Vector2(0.077f, 0f),
                 Size = new Vector2(0.045f, 0.05666667f),
                 OriginAlign = MyGuiDrawAlignEnum.HORISONTAL_LEFT_AND_VERTICAL_CENTER,
-                VisualStyle = MyGuiControlButtonStyleEnum.Close
+                VisualStyle = MyGuiControlButtonStyleEnum.Close,
+				ActivateOnMouseRelease = true,
             };
             m_searchClear.ButtonClicked += OnSearchClear;
 
@@ -341,6 +350,7 @@ namespace Sandbox.Game.Gui
                     MyObjectBuilder_ModInfo modInfo = null;
                     if (File.Exists(modInfoPath))
                     {
+                        MyAnalyticsHelper.ReportActivityStart(null, "show_blueprints", string.Empty, "gui", string.Empty);
                         var success = MyObjectBuilderSerializer.DeserializeXML(modInfoPath, out modInfo);
                         
                         if (!ValidateModInfo(modInfo) || !success)
@@ -481,8 +491,10 @@ namespace Sandbox.Game.Gui
 
         override public void RefreshBlueprintList(bool fromTask = false)
         {
+            m_blueprintList.StoreSituation();
             m_blueprintList.Items.Clear();
             GetLocalBlueprintNames(fromTask);
+            m_blueprintList.RestoreSituation(false,true);
         }
 
         void ReloadTextures()
@@ -533,9 +545,11 @@ namespace Sandbox.Game.Gui
 
         public void RefreshAndReloadBlueprintList()
         {
+            m_blueprintList.StoreSituation();
             m_blueprintList.Items.Clear();
             GetLocalBlueprintNames(true);
             ReloadTextures();
+            m_blueprintList.RestoreSituation(false, true);
         }
 
         void OnSearchClear(MyGuiControlButton button)
@@ -695,6 +709,10 @@ namespace Sandbox.Game.Gui
 
             if (prefab != null)
             {
+                if (MySandboxGame.Static.SessionCompatHelper != null)
+                {
+                    MySandboxGame.Static.SessionCompatHelper.CheckAndFixPrefab(prefab);
+                }
                 return CopyBlueprintPrefabToClipboard(prefab, m_clipboard);
             }
             else
@@ -1070,7 +1088,7 @@ namespace Sandbox.Game.Gui
             prefab.DisplayName = MySteam.UserName;
             prefab.OwnerSteamId = MySteam.UserId;
             if (MyFakes.ENABLE_BATTLE_SYSTEM)
-                prefab.BattlePoints = MyBattleHelper.GetBattlePoints(prefab.CubeGrids);
+                prefab.Points = MyBattleHelper.GetBattlePoints(prefab.CubeGrids);
             prefab.CubeGrids[0].DisplayName = name;
 
             var definitions = MyObjectBuilderSerializer.CreateNewObject<MyObjectBuilder_Definitions>();
@@ -1141,7 +1159,7 @@ namespace Sandbox.Game.Gui
                             oldBlueprint.ShipBlueprints[0].CubeGrids = MyCubeBuilder.Static.Clipboard.CopiedGrids.ToArray();
 
                             if (MyFakes.ENABLE_BATTLE_SYSTEM)
-                                oldBlueprint.ShipBlueprints[0].BattlePoints = MyBattleHelper.GetBattlePoints(oldBlueprint.ShipBlueprints[0].CubeGrids);
+                                oldBlueprint.ShipBlueprints[0].Points = MyBattleHelper.GetBattlePoints(oldBlueprint.ShipBlueprints[0].CubeGrids);
 
                             SavePrefabToFile(oldBlueprint, replace: true);
                             RefreshBlueprintList();
@@ -1154,6 +1172,7 @@ namespace Sandbox.Game.Gui
         protected override void OnClosed()
         {
             base.OnClosed();
+            MyAnalyticsHelper.ReportActivityEnd(null, "show_blueprints");
             if (m_activeDetail)
             {
                 m_detailScreen.CloseScreen();

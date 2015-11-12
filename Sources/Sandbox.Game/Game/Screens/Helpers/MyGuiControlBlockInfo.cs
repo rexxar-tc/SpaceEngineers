@@ -7,7 +7,6 @@ using System.Collections.Generic;
 using System.Linq;
 using System.Text;
 using VRage;
-using VRage;
 using VRage.Utils;
 using VRageMath;
 
@@ -369,6 +368,8 @@ namespace Sandbox.Graphics.GUI
 					m_componentsLabel.Position = m_blockNameLabel.Position + new Vector2(0, m_blockNameLabel.Size.Y) + offset;
 					m_blockNameLabel.Position = m_blockNameLabel.Position + offset;
 				}
+				else
+					m_componentsLabel.Position = rightColumn + new Vector2(0.006f, 0.076f * baseScale);
 
                 m_blockNameLabel.Size = new Vector2(Size.X / 2 - m_blockNameLabel.Position.X, m_blockNameLabel.Size.Y);
                 m_blockTypeLabel.Visible = false;
@@ -428,7 +429,7 @@ namespace Sandbox.Graphics.GUI
             }
         }
 
-        public override void Draw(float transitionAlpha)
+        public override void Draw(float transitionAlpha, float backgroundTransitionAlpha)
         {
             if (BlockInfo != null)
             {
@@ -483,7 +484,9 @@ namespace Sandbox.Graphics.GUI
 								m_componentLines[i].NumbersLabel.TextToDraw.Append(" / ").AppendInt32(info.AvailableAmount);
 						}
 						else
+						{
 							m_componentLines[i].NumbersLabel.TextToDraw.AppendInt32(info.TotalCount);
+						}
                         m_componentLines[i].NumbersLabel.Size = m_componentLines[i].NumbersLabel.GetTextSize();
                         m_componentLines[i].IconPanel.BorderEnabled = ShowCriticalComponent && BlockInfo.CriticalComponentIndex == i;
                         m_componentLines[i].RecalcTextSize();
@@ -502,7 +505,7 @@ namespace Sandbox.Graphics.GUI
                 m_blockIconPanel.BackgroundTexture = new MyGuiCompositeTexture(BlockInfo.BlockIcon);
             }
 
-            base.Draw(transitionAlpha);
+            base.Draw(transitionAlpha, backgroundTransitionAlpha);
         }
     }
 }

@@ -44,6 +44,8 @@ namespace Sandbox.Engine.Physics
         int m_airFrameCounter = 0;
         float m_mass = 0;
 
+        float m_maxImpulse;
+
         //static
         HkCharacterProxy CharacterProxy;
         HkSimpleShapePhantom CharacterPhantom;
@@ -95,11 +97,12 @@ namespace Sandbox.Engine.Physics
         public MyCharacterProxy(bool isDynamic, bool isCapsule, float characterWidth, float characterHeight,
             float crouchHeight, float ladderHeight, float headSize, float headHeight,
             Vector3 position, Vector3 up, Vector3 forward,
-            float mass, MyPhysicsBody body, bool isOnlyVertical, float maxSlope, HkRagdoll ragDoll = null)
+            float mass, MyPhysicsBody body, bool isOnlyVertical, float maxSlope, float maxImpulse, HkRagdoll ragDoll = null)
         {
             m_isDynamic = isDynamic;
             m_physicsBody = body;
-            m_mass =  mass;  
+            m_mass =  mass;
+            m_maxImpulse = maxImpulse;
 
             if (isCapsule)
             {
@@ -219,8 +222,12 @@ namespace Sandbox.Engine.Physics
             }
             if (CharacterRigidBody != null)
             {
-                world.AddCharacterRigidBody(CharacterRigidBody);                
-            }           
+                world.AddCharacterRigidBody(CharacterRigidBody);
+                if (!float.IsInfinity(m_maxImpulse))
+                {
+                    world.BreakOffPartsUtil.MarkEntityBreakable(CharacterRigidBody.GetRigidBody(), m_maxImpulse);
+                }
+            }
         }
 
         public void Deactivate(HkWorld world)
@@ -488,6 +495,8 @@ namespace Sandbox.Engine.Physics
         }
 
         public bool Supported { get; private set; }
+
+        public Vector3 SupportNormal { get; private set; }
         public Vector3 GroundVelocity { get; private set; }
 
         #endregion
@@ -512,6 +521,7 @@ namespace Sandbox.Engine.Physics
                 CharacterRigidBody.StepSimulation(stepSizeInSeconds);
                 CharacterRigidBody.Elevate = Elevate;
                 Supported = CharacterRigidBody.Supported;
+                SupportNormal = CharacterRigidBody.SupportNormal;
                 GroundVelocity = CharacterRigidBody.GroundVelocity;
             }           
         }

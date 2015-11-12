@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.Diagnostics;
 using System.Linq;
 using System.Text;
+using Medieval.ObjectBuilders;
 using Sandbox.Common.ObjectBuilders;
 using Sandbox.Definitions;
 using Sandbox.Game;
@@ -13,6 +14,8 @@ namespace Sandbox.Engine.Utils
 {
     public static class MyBattleHelper
     {
+        public const int MAX_BATTLE_PLAYERS = 32;
+
         private static List<MySlimBlock> m_tmpBlocks = new List<MySlimBlock>();
 
         public static ulong GetBattlePoints(MyCubeGrid grid)
@@ -39,8 +42,11 @@ namespace Sandbox.Engine.Utils
 
         public static ulong GetBattlePoints(MySlimBlock slimBlock)
         {
-            Debug.Assert(slimBlock.BlockDefinition.BattlePoints > 0);
-            ulong pts = (ulong)(slimBlock.BlockDefinition.BattlePoints > 0 ? slimBlock.BlockDefinition.BattlePoints : 1);
+            Debug.Assert(slimBlock.BlockDefinition.Points > 0);
+            ulong pts = (ulong)(slimBlock.BlockDefinition.Points > 0 ? slimBlock.BlockDefinition.Points : 1);
+
+            if (slimBlock.BlockDefinition.IsGeneratedBlock)
+                pts = 0;
 
             // Get points from container items
             IMyInventoryOwner inventoryOwner = slimBlock.FatBlock as IMyInventoryOwner;
@@ -114,15 +120,34 @@ namespace Sandbox.Engine.Utils
 
         public static ulong GetBattlePoints(MyDefinitionId defId)
         {
-            MyCubeBlockDefinition definition = MyDefinitionManager.Static.GetCubeBlockDefinition(defId);
-            if (definition == null)
+            MyCubeBlockDefinition definition;
+            if (!MyDefinitionManager.Static.TryGetCubeBlockDefinition(defId, out definition))
             {
                 Debug.Fail("No cube block definition found to get battle points");
                 return 0;
             }
 
-            Debug.Assert(definition.BattlePoints > 0);
-            return (ulong)(definition.BattlePoints > 0 ? definition.BattlePoints : 1);
+            if (definition.IsGeneratedBlock)
+                return 0;
+
+            Debug.Assert(definition.Points > 0);
+            return (ulong)(definition.Points > 0 ? definition.Points : 1);
+        }
+
+        public static void FillDefaultBattleServerSettings(MyObjectBuilder_SessionSettings settings, bool dedicated)
+        {
+            settings.GameMode = MyGameModeEnum.Survival;
+            settings.Battle = true;
+            settings.OnlineMode = MyOnlineModeEnum.PUBLIC;
+            settings.MaxPlayers = dedicated ? (short)MAX_BATTLE_PLAYERS : (short)6;
+            settings.PermanentDeath = false;
+            settings.AutoSave = false;
+
+            if (settings is MyObjectBuilder_MedievalSessionSettings)
+            {
+                MyObjectBuilder_MedievalSessionSettings me_settings = settings as MyObjectBuilder_MedievalSessionSettings;
+                me_settings.EnableStructuralSimulation = true;
+            }
         }
 
 

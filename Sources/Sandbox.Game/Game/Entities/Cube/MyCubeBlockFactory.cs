@@ -8,6 +8,7 @@ using Sandbox.Common;
 using Sandbox.Common.ObjectBuilders;
 using Sandbox.Common.Components;
 using VRage.Plugins;
+using VRage.ObjectBuilders;
 
 namespace Sandbox.Game.Entities.Cube
 {
@@ -30,19 +31,25 @@ namespace Sandbox.Game.Entities.Cube
             m_objectFactory.RegisterFromAssembly(Assembly.GetAssembly(typeof(MyCubeBlock)));
 
             m_objectFactory.RegisterFromAssembly(MyPlugins.GameAssembly);
+            m_objectFactory.RegisterFromAssembly(MyPlugins.SandboxAssembly); //TODO: Will be removed 
             m_objectFactory.RegisterFromAssembly(MyPlugins.UserAssembly);
         }
 
         public static object CreateCubeBlock(MyObjectBuilder_CubeBlock builder)
         {
             var obj = m_objectFactory.CreateInstance(builder.TypeId);
-            MyEntityFactory.AddScriptGameLogic(obj as MyEntity, builder.TypeId, builder.SubtypeName);
+            var entity = obj as MyEntity; // Some are SlimBlocks
+            if (entity != null)
+            {
+                MyEntityFactory.AddScriptGameLogic(entity, builder.TypeId, builder.SubtypeName);
+                MyEntities.RaiseEntityCreated(entity);
+            }
             return obj;
         }
 
         public static MyObjectBuilder_CubeBlock CreateObjectBuilder(MyCubeBlock cubeBlock)
         {
-            MyObjectBuilder_CubeBlock objectBuilder = (MyObjectBuilder_CubeBlock)Sandbox.Common.ObjectBuilders.Serializer.MyObjectBuilderSerializer.CreateNewObject(cubeBlock.BlockDefinition.Id);
+            MyObjectBuilder_CubeBlock objectBuilder = (MyObjectBuilder_CubeBlock)MyObjectBuilderSerializer.CreateNewObject(cubeBlock.BlockDefinition.Id);
 
             return objectBuilder;
         }

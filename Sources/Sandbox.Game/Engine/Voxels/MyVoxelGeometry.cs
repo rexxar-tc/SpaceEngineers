@@ -13,6 +13,7 @@ using VRage.Voxels;
 using VRageMath;
 using VRageRender;
 using MyGridIntersection = Sandbox.Engine.Utils.MyGridIntersection;
+using VRage.Components;
 
 namespace Sandbox.Engine.Voxels
 {
@@ -370,7 +371,7 @@ namespace Sandbox.Engine.Voxels
                     // overlap to neighbor; introduces extra data but it makes logic for raycasts simpler (no need to check neighbor cells)
                     min -= 1;
                     max += 2;
-                    mesh = MyPrecalcComponent.IsoMesher.Precalc(m_storage, 0, min, max, false);
+                    mesh = MyPrecalcComponent.IsoMesher.Precalc(m_storage, 0, min, max, false,false);
                 }
                 else
                 {
@@ -444,6 +445,5 @@ namespace Sandbox.Engine.Voxels
 
             Debug.Assert(IsEmpty(ref cell) == value);
         }
-
     }
 }

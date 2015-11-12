@@ -9,19 +9,19 @@ using Sandbox.Game.Localization;
 using Sandbox.Game.Multiplayer;
 using Sandbox.Game.World;
 using Sandbox.ModAPI.Interfaces;
-using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
+using VRage.Game.Entity.UseObject;
 using VRage.Import;
 using VRage.Utils;
 using VRageMath;
 using VRageRender;
+using VRage.ModAPI;
+using Sandbox.Engine.Utils;
+using Sandbox.Game.EntityComponents;
 
 namespace Sandbox.Game.Entities.Blocks
 {
     [MyCubeBlockType(typeof(MyObjectBuilder_CryoChamber))]
-    class MyCryoChamber : MyCockpit, IMyPowerConsumer
+    public class MyCryoChamber : MyCockpit
     {
         private MatrixD m_characterDummy;
         private MatrixD m_cameraDummy;
@@ -40,12 +40,6 @@ namespace Sandbox.Game.Entities.Blocks
         private new MyCryoChamberDefinition BlockDefinition
         {
             get { return (MyCryoChamberDefinition)base.BlockDefinition; }
-        }
-
-        public MyPowerReceiver PowerReceiver
-        {
-            get;
-            protected set;
         }
 
         protected override MyStringId LeaveNotificationHintText { get { return MySpaceTexts.NotificationHintLeaveCryoChamber; } }
@@ -79,14 +73,15 @@ namespace Sandbox.Game.Entities.Blocks
                 m_overlayTextureName = overlayTexture;
             }
 
-            PowerReceiver = new MyPowerReceiver(
-                MyConsumerGroupEnum.Utility,
-                false,
+            var sinkComp = new MyResourceSinkComponent();
+			sinkComp.Init(
+                MyStringHash.GetOrCompute(BlockDefinition.ResourceSinkGroup),
                 BlockDefinition.IdlePowerConsumption,
                 this.CalculateRequiredPowerInput);
-            PowerReceiver.IsPoweredChanged += Receiver_IsPoweredChanged;
+            sinkComp.IsPoweredChanged += Receiver_IsPoweredChanged;
+	        ResourceSink = sinkComp;
 
-            NeedsUpdate |= Common.MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
+            NeedsUpdate |= MyEntityUpdateEnum.BEFORE_NEXT_FRAME;
         }
 
         private float CalculateRequiredPowerInput()
@@ -94,7 +89,7 @@ namespace Sandbox.Game.Entities.Blocks
             return BlockDefinition.IdlePowerConsumption;
         }
 
-        void PowerDistributor_PowerStateChaged(MyPowerStateEnum newState)
+        void PowerDistributor_PowerStateChaged(MyResourceStateEnum newState)
         {
             UpdateIsWorking();
             UpdateEmissivity();
@@ -144,7 +139,6 @@ namespace Sandbox.Game.Entities.Blocks
         {
             base.UpdateOnceBeforeFrame();
 
-            m_rechargeSocket.PowerDistributor.PowerStateChaged += PowerDistributor_PowerStateChaged;
             UpdateEmissivity();
         }
 
@@ -171,10 +165,15 @@ namespace Sandbox.Game.Entities.Blocks
         protected override void PlacePilotInSeat(MyCharacter pilot)
         {
             pilot.EnableLights(false, false);
-            pilot.EnableJetpack(false, false, false, false);
+
+	        var jetpack = pilot.JetpackComp;
+			if(jetpack != null)
+				jetpack.TurnOnJetpack(false, false, false, false);
+
             pilot.Sit(true, MySession.LocalCharacter == pilot, false, BlockDefinition.CharacterAnimation);
 
-            pilot.SuitBattery.Enabled = true;
+
+            pilot.SuitBattery.ResourceSource.Enabled = true;
 
             pilot.PositionComp.SetWorldMatrix(m_characterDummy * WorldMatrix);
             UpdateEmissivity(true);
@@ -215,7 +214,7 @@ namespace Sandbox.Game.Entities.Blocks
             base.UpdateAfterSimulation100();
 
             UpdateEmissivity();
-            PowerReceiver.Update();
+            ResourceSink.Update();
         }
 
         private void SetOverlay()
@@ -243,12 +242,17 @@ namespace Sandbox.Game.Entities.Blocks
             {
                 MyCubeBlock.UpdateEmissiveParts(Render.RenderObjectIDs[0], 0.0f, Color.Red, Color.White);
             }
+
+            if (MyFakes.ENABLE_OXYGEN_SOUNDS)
+            {
+                UpdateSound();
+            }
         }
 
         private bool IsPowered()
         {
-            if (PowerReceiver == null || !PowerReceiver.IsPowered) return false;
-            return m_rechargeSocket != null && m_rechargeSocket.PowerDistributor != null && m_rechargeSocket.PowerDistributor.PowerState != MyPowerStateEnum.NoPower;
+            if (ResourceSink == null || !ResourceSink.IsPowered) return false;
+            return m_rechargeSocket != null && m_rechargeSocket.ResourceDistributor != null && m_rechargeSocket.ResourceDistributor.ResourceState != MyResourceStateEnum.NoPower;
         }
 
         protected override bool CheckIsWorking()
@@ -324,7 +328,42 @@ namespace Sandbox.Game.Entities.Blocks
                 }
                 //Pilot is killed by base in survival
             }
+
+            m_soundEmitter.StopSound(true);
         }
+
+        private bool IsLocalCharacterInside()
+        {
+            return MySession.LocalCharacter != null && MySession.LocalCharacter == Pilot;
+        }
+
+        private void UpdateSound()
+        {
+            if (IsWorking)
+            {
+                if (IsLocalCharacterInside())
+                {
+                    if (m_soundEmitter.SoundId != BlockDefinition.InsideSound.SoundId)
+                    {
+                        m_soundEmitter.PlaySound(BlockDefinition.InsideSound, true);
+                    }
+                }
+                else
+                {
+                    if (m_soundEmitter.SoundId != BlockDefinition.OutsideSound.SoundId)
+                    {
+                        m_soundEmitter.PlaySound(BlockDefinition.OutsideSound, true);
+                    }
+                }
+            }
+            else
+            {
+                m_soundEmitter.StopSound(true);
+            }
+
+            m_soundEmitter.Update();
+        }
+        
 
         public void CameraAttachedToChanged(IMyCameraController oldController, IMyCameraController newController)
         {

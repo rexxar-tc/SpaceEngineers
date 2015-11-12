@@ -53,6 +53,7 @@ namespace Sandbox.Engine.Platform.VideoMode
         private const MyAntialiasingMode DEFAULT_ANTI_ALIASING = MyAntialiasingMode.FXAA;
         private const MyShadowsQuality DEFAULT_SHADOW_QUALITY = MyShadowsQuality.HIGH;
         private const bool DEFAULT_MULTITHREADED_RENDERING = true;
+        private const bool DEFAULT_TONEMAPPING = true;
         private const MyTextureQuality DEFAULT_TEXTURE_QUALITY = MyTextureQuality.MEDIUM;
         private const MyTextureAnisoFiltering DEFAULT_ANISOTROPIC_FILTERING = MyTextureAnisoFiltering.ANISO_4;
         private const MyFoliageDetails DEFAULT_FOLIAGE_DETAILS = MyFoliageDetails.MEDIUM;
@@ -159,9 +160,11 @@ namespace Sandbox.Engine.Platform.VideoMode
             m_currentGraphicsSettings.FieldOfView                  = config.FieldOfView;
             m_currentGraphicsSettings.HardwareCursor               = config.HardwareCursor;
             m_currentGraphicsSettings.Render.InterpolationEnabled  = config.RenderInterpolation;
+            m_currentGraphicsSettings.Render.GrassDensityFactor    = config.GrassDensityFactor;
             m_currentGraphicsSettings.Render.AntialiasingMode      = config.AntialiasingMode ?? DEFAULT_ANTI_ALIASING;
             m_currentGraphicsSettings.Render.ShadowQuality         = config.ShadowQuality ?? DEFAULT_SHADOW_QUALITY;
             m_currentGraphicsSettings.Render.MultithreadingEnabled = config.MultithreadedRendering ?? DEFAULT_MULTITHREADED_RENDERING;
+            m_currentGraphicsSettings.Render.TonemappingEnabled    = config.Tonemapping ?? DEFAULT_TONEMAPPING;
             m_currentGraphicsSettings.Render.TextureQuality        = config.TextureQuality ?? DEFAULT_TEXTURE_QUALITY;
             m_currentGraphicsSettings.Render.AnisotropicFiltering  = config.AnisotropicFiltering ?? DEFAULT_ANISOTROPIC_FILTERING;
             m_currentGraphicsSettings.Render.FoliageDetails        = config.FoliageDetails ?? DEFAULT_FOLIAGE_DETAILS;
@@ -215,7 +218,7 @@ namespace Sandbox.Engine.Platform.VideoMode
                     return ChangeResult.Failed;
 
                 m_currentDeviceSettings = settings;
-                m_currentDeviceSettings.VSync = m_currentDeviceSettings.VSync && !VRage.MyCompilationSymbols.RenderOrGpuProfiling;
+                m_currentDeviceSettings.VSync = m_currentDeviceSettings.VSync && !VRage.MyCompilationSymbols.PerformanceOrMemoryProfiling;
                 m_currentDeviceSettings.RefreshRate = MySandboxGame.Config.RefreshRate == 0 ? m_currentDeviceSettings.RefreshRate : MySandboxGame.Config.RefreshRate;
                 MySandboxGame.Static.SwitchSettings(m_currentDeviceSettings);
                 float aspectRatio = (float)m_currentDeviceSettings.BackBufferWidth / (float)m_currentDeviceSettings.BackBufferHeight;
@@ -251,7 +254,9 @@ namespace Sandbox.Engine.Platform.VideoMode
                 MySandboxGame.Log.WriteLine("HardwareCursor: " + settings.HardwareCursor);
                 MySandboxGame.Log.WriteLine("Field of view: " + settings.FieldOfView);
                 MySandboxGame.Log.WriteLine("Render.InterpolationEnabled: " + settings.Render.InterpolationEnabled);
+                MySandboxGame.Log.WriteLine("Render.GrassDensityFactor: " + settings.Render.GrassDensityFactor);
                 MySandboxGame.Log.WriteLine("Render.MultithreadingEnabled: " + settings.Render.MultithreadingEnabled);
+                MySandboxGame.Log.WriteLine("Render.TonemappingEnabled: " + settings.Render.TonemappingEnabled);
                 MySandboxGame.Log.WriteLine("Render.AntialiasingMode: " + settings.Render.AntialiasingMode);
                 MySandboxGame.Log.WriteLine("Render.ShadowQuality: " + settings.Render.ShadowQuality);
                 MySandboxGame.Log.WriteLine("Render.TextureQuality: " + settings.Render.TextureQuality);
@@ -269,7 +274,11 @@ namespace Sandbox.Engine.Platform.VideoMode
                 {
                     MyRenderProxy.SwitchRenderSettings(settings.Render);
                 }
+
                 m_currentGraphicsSettings = settings;
+
+                if(settings.Render.GrassDensityFactor != MyRenderProxy.Settings.GrassDensityFactor)
+                    VRageRender.MyRenderProxy.ReloadGrass();
             }
 
             return ChangeResult.Success;
@@ -571,7 +580,9 @@ namespace Sandbox.Engine.Platform.VideoMode
             // Don't want these to show up in configs for now
             var render = m_currentGraphicsSettings.Render;
             config.RenderInterpolation    = render.InterpolationEnabled;
+            config.GrassDensityFactor     = render.GrassDensityFactor;
             config.MultithreadedRendering = render.MultithreadingEnabled == DEFAULT_MULTITHREADED_RENDERING ? (bool?)null : render.MultithreadingEnabled;
+            config.Tonemapping            = render.TonemappingEnabled == DEFAULT_TONEMAPPING ? (bool?)null : render.TonemappingEnabled;
             config.AntialiasingMode       = render.AntialiasingMode == DEFAULT_ANTI_ALIASING ? (MyAntialiasingMode?)null : render.AntialiasingMode;
             config.ShadowQuality          = render.ShadowQuality == DEFAULT_SHADOW_QUALITY ? (MyShadowsQuality?)null : render.ShadowQuality;
             config.TextureQuality         = render.TextureQuality == DEFAULT_TEXTURE_QUALITY ? (MyTextureQuality?)null : render.TextureQuality;

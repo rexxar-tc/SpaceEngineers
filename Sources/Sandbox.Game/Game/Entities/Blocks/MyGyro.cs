@@ -19,13 +19,14 @@ using Sandbox.ModAPI;
 using Sandbox.Game.Localization;
 using VRage;
 using VRage.Utils;
+using VRage.ModAPI;
 
 #endregion
 
 namespace Sandbox.Game.Entities
 {
     [MyCubeBlockType(typeof(MyObjectBuilder_Gyro))]
-    class MyGyro : MyFunctionalBlock, IMyGyro
+    public class MyGyro : MyFunctionalBlock, IMyGyro
     {
         private MyGyroDefinition m_gyroDefinition;
         private int m_oldEmissiveState = -1;
@@ -35,7 +36,7 @@ namespace Sandbox.Game.Entities
 
         public bool IsPowered
         {
-            get { return CubeGrid.GridSystems.GyroSystem.PowerReceiver.IsPowered; }
+            get { return CubeGrid.GridSystems.GyroSystem.ResourceSink.IsPowered; }
         }
 
         protected override bool CheckIsWorking()
